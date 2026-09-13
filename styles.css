@@ -385,6 +385,283 @@ label {
   }
 }
 
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.tab {
+  border-radius: 999px;
+  padding: 9px 18px;
+  font-weight: 800;
+}
+
+.tab.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+
+.conflict-box {
+  border: 1px solid var(--red);
+  border-radius: 8px;
+  background: rgba(179, 72, 72, 0.08);
+  padding: 12px;
+  margin-bottom: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.conflict-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.conflict-item span {
+  flex: 1;
+  min-width: 240px;
+}
+
+.wb-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.wb-game-picker {
+  min-width: 260px;
+}
+
+.io-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.wb-layout {
+  display: grid;
+  grid-template-columns: 340px minmax(320px, 1fr) 380px;
+  gap: 16px;
+  align-items: start;
+}
+
+.wb-form {
+  display: grid;
+  gap: 10px;
+}
+
+.field-label {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.check-list {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  padding: 8px;
+  max-height: 150px;
+  overflow: auto;
+}
+
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.check-item input {
+  width: auto;
+}
+
+.version-list,
+.combo-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.version-card,
+.combo-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.combo-card.archived {
+  opacity: 0.72;
+}
+
+.version-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.version-meta {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rev-badge {
+  border-radius: 999px;
+  background: rgba(32, 35, 38, 0.08);
+  color: var(--muted);
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.stale-badge {
+  border-radius: 999px;
+  background: rgba(213, 162, 61, 0.2);
+  color: #8a6414;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.status-pill {
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.status-pill.draft {
+  background: rgba(213, 162, 61, 0.18);
+  color: #8a6414;
+}
+
+.status-pill.published {
+  background: rgba(57, 116, 91, 0.15);
+  color: var(--green);
+}
+
+.status-pill.archived {
+  background: rgba(104, 112, 121, 0.15);
+  color: var(--muted);
+}
+
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.card-actions button {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.verdict {
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.verdict ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.verdict.ok {
+  border: 1px solid rgba(57, 116, 91, 0.5);
+  background: rgba(57, 116, 91, 0.1);
+  color: var(--green);
+}
+
+.verdict.bad {
+  border: 1px solid rgba(179, 72, 72, 0.5);
+  background: rgba(179, 72, 72, 0.08);
+  color: var(--red);
+}
+
+.verdict.slim {
+  padding: 8px 10px;
+}
+
+.verdict.report {
+  margin-bottom: 14px;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button:disabled:hover {
+  border-color: var(--line);
+}
+
+.history-list {
+  margin: 0;
+  padding: 8px 8px 8px 22px;
+  border-top: 1px dashed var(--line);
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.session-list {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.session-list .field-label {
+  margin-bottom: 0;
+}
+
+.pill.affected {
+  background: rgba(179, 72, 72, 0.14);
+  color: var(--red);
+}
+
+.form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.form-actions button {
+  flex: 1;
+}
+
+@media (max-width: 1160px) {
+  .wb-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .wb-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 @media (max-width: 640px) {
   .shell {
     width: min(100vw - 20px, 1440px);

@@ -29,98 +29,220 @@
         </div>
       </header>
 
-      <section class="controls">
-        <label>
-          搜索
-          <input id="searchInput" type="search" placeholder="游戏名或规则关键词" />
-        </label>
-        <label>
-          人数
-          <select id="playerFilter">
-            <option value="all">全部</option>
-            <option value="2">适合2人</option>
-            <option value="3">适合3人</option>
-            <option value="4">适合4人</option>
-            <option value="5">适合5人</option>
-          </select>
-        </label>
-        <label>
-          复杂度
-          <select id="complexityFilter">
-            <option value="all">全部</option>
-            <option value="轻">轻</option>
-            <option value="中">中</option>
-            <option value="重">重</option>
-          </select>
-        </label>
-        <label>
-          排序
-          <select id="sortMode">
-            <option value="stale">最近未玩</option>
-            <option value="name">名称</option>
-            <option value="complexity">复杂度</option>
-          </select>
-        </label>
-      </section>
+      <nav class="tabs">
+        <button id="tabCollection" class="tab active" type="button">收藏卡片</button>
+        <button id="tabWorkbench" class="tab" type="button">版本兼容验算台</button>
+      </nav>
 
-      <section class="layout">
-        <aside class="panel">
-          <h2>新增桌游</h2>
-          <form id="gameForm" class="game-form">
-            <label>
-              名称
-              <input id="nameInput" required placeholder="例：勃艮第城堡" />
-            </label>
-            <div class="split">
-              <label>
-                最少人数
-                <input id="minPlayersInput" type="number" min="1" max="12" value="2" required />
-              </label>
-              <label>
-                最多人数
-                <input id="maxPlayersInput" type="number" min="1" max="12" value="4" required />
-              </label>
-            </div>
-            <div class="split">
-              <label>
-                时长分钟
-                <input id="durationInput" type="number" min="5" value="90" required />
-              </label>
-              <label>
-                复杂度
-                <select id="complexityInput">
-                  <option value="轻">轻</option>
-                  <option value="中" selected>中</option>
-                  <option value="重">重</option>
-                </select>
-              </label>
-            </div>
-            <label>
-              上次游玩
-              <input id="lastPlayedInput" type="date" required />
-            </label>
-            <label>
-              封面图
-              <input id="coverInput" type="file" accept="image/*" />
-            </label>
-            <button class="primary" type="submit">加入收藏</button>
-          </form>
-        </aside>
+      <div id="conflictBanner"></div>
 
-        <section class="panel list-panel">
-          <div class="panel-head">
-            <h2>收藏列表</h2>
-            <span id="visibleCount"></span>
-          </div>
-          <div id="gameList" class="game-list"></div>
+      <section id="collectionView">
+        <section class="controls">
+          <label>
+            搜索
+            <input id="searchInput" type="search" placeholder="游戏名或规则关键词" />
+          </label>
+          <label>
+            人数
+            <select id="playerFilter">
+              <option value="all">全部</option>
+              <option value="2">适合2人</option>
+              <option value="3">适合3人</option>
+              <option value="4">适合4人</option>
+              <option value="5">适合5人</option>
+            </select>
+          </label>
+          <label>
+            复杂度
+            <select id="complexityFilter">
+              <option value="all">全部</option>
+              <option value="轻">轻</option>
+              <option value="中">中</option>
+              <option value="重">重</option>
+            </select>
+          </label>
+          <label>
+            排序
+            <select id="sortMode">
+              <option value="stale">最近未玩</option>
+              <option value="name">名称</option>
+              <option value="complexity">复杂度</option>
+            </select>
+          </label>
         </section>
 
-        <aside class="panel detail-panel">
-          <div id="detailView"></div>
-        </aside>
+        <section class="layout">
+          <aside class="panel">
+            <h2>新增桌游</h2>
+            <form id="gameForm" class="game-form">
+              <label>
+                名称
+                <input id="nameInput" required placeholder="例：勃艮第城堡" />
+              </label>
+              <div class="split">
+                <label>
+                  最少人数
+                  <input id="minPlayersInput" type="number" min="1" max="12" value="2" required />
+                </label>
+                <label>
+                  最多人数
+                  <input id="maxPlayersInput" type="number" min="1" max="12" value="4" required />
+                </label>
+              </div>
+              <div class="split">
+                <label>
+                  时长分钟
+                  <input id="durationInput" type="number" min="5" value="90" required />
+                </label>
+                <label>
+                  复杂度
+                  <select id="complexityInput">
+                    <option value="轻">轻</option>
+                    <option value="中" selected>中</option>
+                    <option value="重">重</option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                上次游玩
+                <input id="lastPlayedInput" type="date" required />
+              </label>
+              <label>
+                封面图
+                <input id="coverInput" type="file" accept="image/*" />
+              </label>
+              <button class="primary" type="submit">加入收藏</button>
+            </form>
+          </aside>
+
+          <section class="panel list-panel">
+            <div class="panel-head">
+              <h2>收藏列表</h2>
+              <span id="visibleCount"></span>
+            </div>
+            <div id="gameList" class="game-list"></div>
+          </section>
+
+          <aside class="panel detail-panel">
+            <div id="detailView"></div>
+          </aside>
+        </section>
+      </section>
+
+      <section id="workbenchView" hidden>
+        <div class="wb-head panel">
+          <label class="wb-game-picker">
+            验算桌游
+            <select id="wbGameSelect"></select>
+          </label>
+          <div class="io-actions">
+            <button id="exportBtn" type="button">导出数据</button>
+            <button id="importBtn" type="button">导入数据</button>
+            <input id="importFile" type="file" accept="application/json,.json" hidden />
+          </div>
+        </div>
+        <div id="importReport"></div>
+
+        <div class="wb-layout">
+          <aside class="panel" id="versionPanel">
+            <div class="panel-head">
+              <h2>版本登记</h2>
+              <button id="genBaseBtn" type="button" hidden>从收藏生成基础版本</button>
+            </div>
+            <div id="versionList" class="version-list"></div>
+            <form id="versionForm" class="wb-form">
+              <h3 id="versionFormTitle">登记新版本</h3>
+              <input id="versionEditId" type="hidden" />
+              <label>
+                类型
+                <select id="versionKind">
+                  <option value="base">基础版本</option>
+                  <option value="expansion">扩展</option>
+                </select>
+              </label>
+              <label>
+                名称
+                <input id="versionName" required placeholder="例：贸易版图" />
+              </label>
+              <div class="split">
+                <label>
+                  <span id="minDeltaLabel">最少人数</span>
+                  <input id="versionMinDelta" type="number" value="0" required />
+                </label>
+                <label>
+                  <span id="maxDeltaLabel">最多人数</span>
+                  <input id="versionMaxDelta" type="number" value="0" required />
+                </label>
+              </div>
+              <label>
+                <span id="durationDeltaLabel">时长（分钟）</span>
+                <input id="versionDurationDelta" type="number" value="0" required />
+              </label>
+              <div>
+                <span class="field-label">组件依赖（勾选需要先拥有的版本）</span>
+                <div id="versionRequires" class="check-list"></div>
+              </div>
+              <div>
+                <span class="field-label">互斥（勾选不能同局的版本）</span>
+                <div id="versionExcludes" class="check-list"></div>
+              </div>
+              <label>
+                效果（每行一条，格式：标签: 描述；同标签会被判为效果冲突）
+                <textarea id="versionEffects" rows="2" placeholder="起始资源: 每人多 2 金币"></textarea>
+              </label>
+              <div class="form-actions">
+                <button class="primary" type="submit">保存版本</button>
+                <button id="versionCancelEdit" type="button" hidden>取消编辑</button>
+              </div>
+            </form>
+          </aside>
+
+          <section class="panel" id="builderPanel">
+            <h2>组合验算</h2>
+            <form id="comboForm" class="wb-form">
+              <input id="comboEditId" type="hidden" />
+              <label>
+                组合名称
+                <input id="comboName" required placeholder="例：周五四人局" />
+              </label>
+              <label>
+                基础版本
+                <select id="comboBase"></select>
+              </label>
+              <div>
+                <span class="field-label">扩展</span>
+                <div id="comboExps" class="check-list"></div>
+              </div>
+              <label>
+                人数
+                <input id="comboPlayers" type="number" min="1" max="12" value="4" required />
+              </label>
+              <div id="comboVerdict" class="verdict"></div>
+              <div class="form-actions">
+                <button id="saveDraftBtn" type="button">存草稿</button>
+                <button id="publishBtn" class="primary" type="button">发布组合</button>
+                <button id="cancelComboEdit" type="button" hidden>取消编辑</button>
+              </div>
+            </form>
+          </section>
+
+          <aside class="panel" id="comboPanel">
+            <div class="panel-head">
+              <h2>组合管理</h2>
+              <select id="comboStatusFilter">
+                <option value="all">全部状态</option>
+                <option value="draft">草稿</option>
+                <option value="published">已发布</option>
+                <option value="archived">已归档</option>
+              </select>
+            </div>
+            <div id="comboList" class="combo-list"></div>
+          </aside>
+        </div>
       </section>
     </main>
 
     <script src="app.js"></script>
+    <script src="workbench.js"></script>
   </body>
 </html>
