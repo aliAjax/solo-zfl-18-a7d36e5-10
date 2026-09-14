@@ -173,20 +173,36 @@ function deleteFromCollection(collection, id) {
 
 // ---------- 多页合并：按实体修订号合并，冲突不静默覆盖 ----------
 function fingerprint(entity) {
+  if (entity == null) return "∅";
   const copy = { ...entity };
   delete copy.rev;
   return JSON.stringify(copy);
 }
 
+function pushConflict(entry) {
+  const dup = state.conflicts.some(
+    (item) =>
+      item.collection === entry.collection &&
+      item.id === entry.id &&
+      fingerprint(item.local) === fingerprint(entry.local) &&
+      fingerprint(item.remote) === fingerprint(entry.remote)
+  );
+  if (dup) return false;
+  state.conflicts.push(entry);
+  return true;
+}
+
 function mergeRemote(remote) {
   if (!remote || !remote.meta) return false;
   let changed = false;
+  const newTombs = { games: new Set(), versions: new Set(), combos: new Set(), sessions: new Set() };
 
   for (const col of COLLECTIONS) {
     const remoteTomb = remote.tombstones?.[col] || {};
     for (const [id, rev] of Object.entries(remoteTomb)) {
       if (rev > (state.tombstones[col][id] || 0)) {
         state.tombstones[col][id] = rev;
+        newTombs[col].add(id);
         changed = true;
       }
     }
@@ -194,9 +210,19 @@ function mergeRemote(remote) {
 
   for (const col of COLLECTIONS) {
     const localArr = state[col];
+    const tombs = state.tombstones[col];
     for (const remoteEntity of remote[col] || []) {
-      const tombRev = state.tombstones[col][remoteEntity.id] || 0;
-      if (tombRev >= (remoteEntity.rev || 0)) continue; // 删除优先
+      const tombRev = tombs[remoteEntity.id] || 0;
+      const remoteRev = remoteEntity.rev || 0;
+      if (tombRev > remoteRev) continue; // 删除晚于该编辑，静默生效
+      if (tombRev > 0 && tombRev === remoteRev) {
+        // 远端编辑与删除并发相撞：记录冲突，不静默选边，实体暂不恢复
+        const localEntity = localArr.find((item) => item.id === remoteEntity.id) || null;
+        // 双方保留的内容完全一致时，删除冲突已在本地记录过，不重复计
+        if (localEntity && fingerprint(localEntity) === fingerprint(remoteEntity)) continue;
+        if (pushConflict({ collection: col, id: remoteEntity.id, local: localEntity, remote: remoteEntity })) changed = true;
+        continue;
+      }
       const index = localArr.findIndex((item) => item.id === remoteEntity.id);
       if (index === -1) {
         localArr.push(remoteEntity);
@@ -205,28 +231,29 @@ function mergeRemote(remote) {
       }
       const localEntity = localArr[index];
       const localRev = localEntity.rev || 0;
-      const remoteRev = remoteEntity.rev || 0;
       if (remoteRev > localRev) {
         localArr[index] = remoteEntity;
         changed = true;
       } else if (remoteRev === localRev && fingerprint(localEntity) !== fingerprint(remoteEntity)) {
         // 同一修订号内容却不同：两个页面同时改了同一实体，记录冲突而不是覆盖
-        const dup = state.conflicts.some(
-          (item) =>
-            item.collection === col &&
-            item.id === remoteEntity.id &&
-            fingerprint(item.local) === fingerprint(localEntity) &&
-            fingerprint(item.remote) === fingerprint(remoteEntity)
-        );
-        if (!dup) {
-          state.conflicts.push({ collection: col, id: remoteEntity.id, local: localEntity, remote: remoteEntity });
-          changed = true;
-        }
+        if (pushConflict({ collection: col, id: remoteEntity.id, local: localEntity, remote: remoteEntity })) changed = true;
       }
     }
-    const before = localArr.length;
-    state[col] = localArr.filter((item) => (state.tombstones[col][item.id] || 0) < (item.rev || 0));
-    if (state[col].length !== before) changed = true;
+    // 本地实体 vs 墓碑：仅当墓碑是本次合并新获知时才判定为相撞；
+    // 旧墓碑+高修订实体是已解决/已收敛的状态，不重复记冲突
+    const kept = [];
+    for (const item of localArr) {
+      const tombRev = tombs[item.id] || 0;
+      if (!tombRev) {
+        kept.push(item);
+      } else if ((item.rev || 0) >= tombRev) {
+        if (newTombs[col].has(item.id) && pushConflict({ collection: col, id: item.id, local: item, remote: null })) changed = true;
+        kept.push(item);
+      } else {
+        changed = true; // 删除晚于编辑，静默生效
+      }
+    }
+    state[col] = kept;
   }
 
   const remoteRev = Number(remote.meta.rev) || 0;
@@ -238,15 +265,19 @@ function mergeRemote(remote) {
 }
 
 function resolveConflict(conflict, keep) {
-  const arr = state[conflict.collection];
-  const index = arr.findIndex((item) => item.id === conflict.id);
-  if (keep === "remote") {
-    const adopted = { ...conflict.remote };
-    touch(adopted);
+  const winner = keep === "remote" ? conflict.remote : conflict.local;
+  if (winner) {
+    const adopted = { ...winner };
+    touch(adopted); // 提升修订号，下一轮同步时胜出（也盖过墓碑）
+    const arr = state[conflict.collection];
+    const index = arr.findIndex((item) => item.id === conflict.id);
     if (index === -1) arr.push(adopted);
     else arr[index] = adopted;
-  } else if (index !== -1) {
-    touch(arr[index]); // 提升本地修订号，下一轮同步时胜出
+  } else {
+    // 获胜方是“已删除”：提升墓碑修订号并移除实体
+    state.meta.rev += 1;
+    state.tombstones[conflict.collection][conflict.id] = state.meta.rev;
+    state[conflict.collection] = state[conflict.collection].filter((item) => item.id !== conflict.id);
   }
   state.conflicts = state.conflicts.filter((item) => item !== conflict);
   renderAll();
@@ -458,9 +489,15 @@ function renderConflicts() {
         .map((conflict, index) => {
           const label = COLLECTION_LABEL[conflict.collection] || conflict.collection;
           const name = conflict.local?.name || conflict.remote?.name || conflict.id;
+          const scene =
+            conflict.local == null
+              ? "本页已将其删除，另一页面却编辑了它"
+              : conflict.remote == null
+                ? "另一页面已将其删除，本页保留或编辑了它"
+                : "两个页面同时编辑了它";
           return `
             <div class="conflict-item">
-              <span>【${label}】${escapeHtml(name)}：本地「${escapeHtml(conflict.local?.name ?? "已删除")}」与另一页面「${escapeHtml(conflict.remote?.name ?? "已删除")}」不一致</span>
+              <span>【${label}】${escapeHtml(name)}：${scene}（本地「${escapeHtml(conflict.local?.name ?? "已删除")}」/ 对方「${escapeHtml(conflict.remote?.name ?? "已删除")}」）</span>
               <button type="button" data-conflict-index="${index}" data-keep="local">保留本页</button>
               <button type="button" data-conflict-index="${index}" data-keep="remote">采用对方</button>
             </div>

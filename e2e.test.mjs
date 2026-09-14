@@ -175,6 +175,23 @@ check("归档成功", (await page.locator(".combo-card.archived", { has: page.lo
 await comboCard("四人基础局").locator("[data-combo-action=restore]").click();
 check("恢复草稿成功", (await page.locator(".combo-card.draft", { has: page.locator("strong", { hasText: "四人基础局" }) }).count()) === 1);
 
+// ============ 2.5 反例：基础版本单方面互斥 ============
+console.log("\n[2.5] 反例：基础侧单方面互斥");
+await versionCard("标准版").locator("[data-version-edit]").click();
+await page.locator("#versionExcludes .check-item", { hasText: "贸易版图" }).locator("input").check();
+await page.click("#versionForm button[type=submit]");
+await page.fill("#comboName", "基础互斥局");
+await page.locator("#comboExps .check-item", { hasText: "贸易版图" }).locator("input").check();
+await page.waitForSelector("#comboVerdict.bad");
+check("基础侧单方面互斥被拦住", (await page.locator("#comboVerdict").textContent()).includes("互斥冲突"));
+check("基础侧互斥时发布禁用", await page.locator("#publishBtn").isDisabled());
+// 清理现场
+await page.locator("#comboExps .check-item", { hasText: "贸易版图" }).locator("input").uncheck();
+await versionCard("标准版").locator("[data-version-edit]").click();
+await page.locator("#versionExcludes .check-item", { hasText: "贸易版图" }).locator("input").uncheck();
+await page.click("#versionForm button[type=submit]");
+await page.fill("#comboName", "");
+
 // ============ 3. 导入导出：校验与回滚 ============
 console.log("\n[3] 导入导出与回滚");
 const snapshot = await page.evaluate((k) => localStorage.getItem(k), KEY);
@@ -187,6 +204,9 @@ const stdBase = stateNow.versions.find((v) => v.name === "标准版");
 async function importJson(name, obj) {
   const path = `/tmp/${name}.json`;
   writeFileSync(path, JSON.stringify(obj));
+  await page.evaluate(() => {
+    document.querySelector("#importReport").innerHTML = "";
+  });
   await page.setInputFiles("#importFile", path);
   await page.waitForSelector("#importReport .verdict");
 }
@@ -236,6 +256,38 @@ const downloadPromise = page.waitForEvent("download");
 await page.click("#exportBtn");
 const download = await downloadPromise;
 check("导出文件生成", (await download.suggestedFilename()).endsWith(".json"));
+
+// ============ 3.5 反例：语义无效组合与缺归属版本导入 ============
+console.log("\n[3.5] 反例：语义无效与缺归属导入");
+const snapshot2 = await page.evaluate((k) => localStorage.getItem(k), KEY);
+
+// 带已发布状态的效果冲突组合 → 拒绝整份
+await importJson("bad-effect", {
+  versions: [
+    { id: "ec-1", gameId: orleans.id, kind: "expansion", name: "冲突甲", requires: [], excludes: [], minDelta: 0, maxDelta: 0, durationDelta: 0, effects: [{ tag: "终局", text: "A" }] },
+    { id: "ec-2", gameId: orleans.id, kind: "expansion", name: "冲突乙", requires: [], excludes: [], minDelta: 0, maxDelta: 0, durationDelta: 0, effects: [{ tag: "终局", text: "B" }] }
+  ],
+  combos: [{ id: "ec-c", gameId: orleans.id, name: "效果冲突局", baseVersionId: stdBase.id, expansionIds: ["ec-1", "ec-2"], players: 4, status: "published", revision: 1, history: [] }]
+});
+report = await page.locator("#importReport").textContent();
+check("已发布的效果冲突组合导入被拒绝", report.includes("组合语义无效") && report.includes("效果冲突"));
+check("效果冲突导入未改动数据", (await page.evaluate((k) => localStorage.getItem(k), KEY)) === snapshot2);
+
+// 带已发布状态的重复扩展组合 → 拒绝整份
+await importJson("bad-dupexp", {
+  combos: [{ id: "dup-c", gameId: orleans.id, name: "重复扩展局", baseVersionId: stdBase.id, expansionIds: [tradeExp.id, tradeExp.id], players: 4, status: "published", revision: 1, history: [] }]
+});
+report = await page.locator("#importReport").textContent();
+check("已发布的重复扩展组合导入被拒绝", report.includes("组合语义无效") && report.includes("重复扩展"));
+check("重复扩展导入未改动数据", (await page.evaluate((k) => localStorage.getItem(k), KEY)) === snapshot2);
+
+// 缺少归属桌游的版本 → 拒绝整份
+await importJson("bad-orphan", {
+  versions: [{ id: "orphan-1", kind: "expansion", name: "无归属扩展", requires: [], excludes: [], minDelta: 0, maxDelta: 0, durationDelta: 0, effects: [] }]
+});
+report = await page.locator("#importReport").textContent();
+check("缺归属版本导入被拒绝", report.includes("失效引用") && report.includes("归属"));
+check("缺归属导入未改动数据", (await page.evaluate((k) => localStorage.getItem(k), KEY)) === snapshot2);
 
 // ============ 4. 刷新恢复：筛选 + 草稿 ============
 console.log("\n[4] 刷新恢复");
@@ -288,6 +340,62 @@ await page2.waitForFunction(
   KEY
 );
 check("对端页面最终收敛一致", true);
+
+// ============ 5.5 反例：移除与编辑同一实体相撞 ============
+console.log("\n[5.5] 反例：移除与编辑相撞");
+const tab2 = await page2.evaluate(() => tabId);
+const waitPage2Settled = () =>
+  page2.waitForFunction(([k, t]) => JSON.parse(localStorage.getItem(k)).meta.tabId === t, [KEY, tab2]);
+
+// 方向一：本页编辑组合，对端并发删除同一组合
+await page.click("#tabWorkbench");
+await page.selectOption("#wbGameSelect", orleans.id);
+await comboCard("草稿占位").locator("[data-combo-action=edit]").click();
+await page.fill("#comboPlayers", "2");
+await page.click("#saveDraftBtn"); // 保存修订，提升修订号
+await comboCard("草稿占位").waitFor();
+await waitPage2Settled(); // 等对端合并完本次编辑，消除竞态
+const comboInfo = await page.evaluate((k) => {
+  const d = JSON.parse(localStorage.getItem(k));
+  const c = d.combos.find((x) => x.name === "草稿占位");
+  return { id: c.id, rev: c.rev };
+}, KEY);
+await page2.evaluate(([k, id, rev]) => {
+  const d = JSON.parse(localStorage.getItem(k));
+  d.combos = d.combos.filter((x) => x.id !== id);
+  d.tombstones.combos[id] = rev; // 与编辑同修订号的并发删除
+  d.meta.rev = rev;
+  d.meta.tabId = "other-tab";
+  localStorage.setItem(k, JSON.stringify(d));
+}, [KEY, comboInfo.id, comboInfo.rev]);
+await page.waitForSelector("#conflictBanner .conflict-box");
+check("编辑vs删除出现冲突记录", (await page.locator("#conflictBanner .conflict-item").count()) === 1);
+check("编辑未被静默丢掉", (await comboCard("草稿占位").count()) === 1);
+check("冲突提示标明删除方", (await page.locator("#conflictBanner").textContent()).includes("已删除"));
+await page.click("#conflictBanner [data-keep=local]");
+await page.waitForSelector("#conflictBanner .conflict-box", { state: "detached" });
+check("保留本页后组合仍在", (await comboCard("草稿占位").count()) === 1);
+await page2.waitForFunction(([k, id]) => JSON.parse(localStorage.getItem(k)).combos.some((x) => x.id === id), [KEY, comboInfo.id]);
+check("对端收敛后组合恢复", true);
+
+// 方向二：本页删除组合，对端并发编辑同一组合
+await comboCard("草稿占位").locator("[data-combo-action=delete]").click();
+check("本页删除组合生效", (await comboCard("草稿占位").count()) === 0);
+await waitPage2Settled();
+const tombRev = await page.evaluate(([k, id]) => JSON.parse(localStorage.getItem(k)).tombstones.combos[id], [KEY, comboInfo.id]);
+await page2.evaluate(([k, id, rev, gameId, baseId]) => {
+  const d = JSON.parse(localStorage.getItem(k));
+  d.combos.push({ id, gameId, name: "草稿占位", baseVersionId: baseId, expansionIds: [], players: 2, status: "draft", revision: 3, versionStale: false, history: [], createdAt: "2026-09-13T00:00:00.000Z", rev }); // 与墓碑同修订号的并发编辑
+  d.meta.rev = rev;
+  d.meta.tabId = "other-tab";
+  localStorage.setItem(k, JSON.stringify(d));
+}, [KEY, comboInfo.id, tombRev, orleans.id, stdBase.id]);
+await page.waitForSelector("#conflictBanner .conflict-box");
+check("删除vs编辑出现冲突记录", (await page.locator("#conflictBanner .conflict-item").count()) === 1);
+check("删除未被静默撤销", (await comboCard("草稿占位").count()) === 0);
+await page.click("#conflictBanner [data-keep=remote]");
+await comboCard("草稿占位").waitFor();
+check("采用对方后组合恢复且可继续编辑", (await comboCard("草稿占位").count()) === 1);
 
 await page2.close();
 await browser.close();

@@ -93,9 +93,9 @@ function findCycle(versions) {
   return cycle;
 }
 
-function validateCombo(gameId, baseId, expIds, players) {
+function validateCombo(gameId, baseId, expIds, players, pool) {
   const issues = [];
-  const versions = getGameVersions(gameId);
+  const versions = pool || getGameVersions(gameId);
   const byId = new Map(versions.map((v) => [v.id, v]));
   const base = byId.get(baseId);
   if (!base || base.kind !== "base") {
@@ -137,11 +137,17 @@ function validateCombo(gameId, baseId, expIds, players) {
   const cycle = findCycle([base, ...selected]);
   if (cycle) issues.push({ type: "cycle", msg: `循环依赖：${cycle.map((v) => v.name).join(" → ")}` });
 
-  // 互斥冲突
-  for (const v of selected) {
+  // 互斥冲突：双方任一声明即阻断（基础版本的声明同样生效）
+  const allSelected = [base, ...selected];
+  const seenPairs = new Set();
+  for (const v of allSelected) {
     for (const exId of v.excludes || []) {
-      if (exId === baseId) issues.push({ type: "conflict", msg: `互斥冲突：「${v.name}」与基础版「${base.name}」不能同局` });
-      else if (selectedIds.has(exId)) issues.push({ type: "conflict", msg: `互斥冲突：「${v.name}」与「${versionLabel(byId.get(exId))}」不能同局` });
+      const other = allSelected.find((x) => x.id === exId);
+      if (!other) continue;
+      const pairKey = [v.id, exId].sort().join("|");
+      if (seenPairs.has(pairKey)) continue;
+      seenPairs.add(pairKey);
+      issues.push({ type: "conflict", msg: `互斥冲突：「${v.name}」与「${other.name}」不能同局` });
     }
   }
 
@@ -671,10 +677,11 @@ function validateImport(data) {
   const versionIds = new Set([...state.versions.map((v) => v.id), ...versions.map((v) => v.id)]);
   const comboIds = new Set([...state.combos.map((c) => c.id), ...combos.map((c) => c.id)]);
 
-  // 失效引用
+  // 失效引用 / 归属不完整
   for (const v of versions) {
     if (!v.id || !v.name) errors.push(`失效引用：存在缺少 id 或名称的版本`);
-    if (v.gameId && !gameIds.has(v.gameId)) errors.push(`失效引用：版本「${v.name}」所属的桌游不存在`);
+    if (v.kind !== "base" && v.kind !== "expansion") errors.push(`失效引用：版本「${v.name}」类型缺失或非法`);
+    if (!v.gameId || !gameIds.has(v.gameId)) errors.push(`失效引用：版本「${v.name}」缺少归属桌游或所属桌游不存在`);
     for (const ref of [...(v.requires || []), ...(v.excludes || [])]) {
       if (!versionIds.has(ref)) errors.push(`失效引用：版本「${v.name}」的依赖/互斥指向不存在的组件 ${ref}`);
     }
@@ -717,6 +724,17 @@ function validateImport(data) {
         }
       }
     }
+  }
+
+  // 组合语义无效：对导入组合跑完整验算（重复扩展/互斥/效果冲突/循环/人数范围），
+  // 任何状态（包括已发布）的组合语义无效都拒绝整份数据
+  const mergedPool = [...mergedVersions.values()];
+  for (const c of combos) {
+    if (!c.gameId || !gameIds.has(c.gameId)) continue; // 引用错误已在上面记录
+    if (!c.baseVersionId || !versionIds.has(c.baseVersionId)) continue;
+    const pool = mergedPool.filter((v) => v.gameId === c.gameId);
+    const { issues } = validateCombo(c.gameId, c.baseVersionId, c.expansionIds || [], Number(c.players) || 0, pool);
+    for (const issue of issues) errors.push(`组合语义无效：「${c.name}」${issue.msg}`);
   }
 
   // 重复组合：同 id 同内容视为已存在跳过；同 id 不同内容为冲突；签名重复为重复组合
